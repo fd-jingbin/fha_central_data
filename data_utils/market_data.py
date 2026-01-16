@@ -413,22 +413,23 @@ class BbgExcelLoader:
         if save_pickle_dir is not None:
             df_stacked.to_pickle(save_pickle_dir)
 
-        return df_stacked
+        return df_stacke.dropna(axis=1, how="all")
 
     def save_bds_to_structured_pickle(self, name_list, field_value, extra_params, n_space, temp_excel_path, final_excel_path,
                                       pickle_path, return_df=False):
         self.insert_names_with_formulas_simple_bds(name_list, field_value, extra_params, n_space, filename=temp_excel_path)
         self.open_like_human_wait_and_save(temp_excel_path, final_excel_path,
                                       wait_seconds=max(int(len(name_list) * 0.5), 20))
-        self.stack_bds_excel_data(file_path=final_excel_path, n_space=n_space, save_pickle_dir=pickle_path)
+        self.stack_bds_excel_data(file_path=temp_excel_path, n_space=n_space, save_pickle_dir=pickle_path)
         if return_df:
-            return pd.read_pickle(pickle_path)
+            return pd.read_pickle(str(os.path.join(self.cfg.BBG_DEFAULT_PICKLE_DIR, pickle_path)))
 
-    def save_bdp_to_structured_pickle(self, name_list, field_dict, temp_excel_path, final_excel_path, pickle_path, return_df=False):
+    def save_bdp_to_structured_pickle(self, name_list, field_dict, temp_excel_path, final_excel_path, pickle_path, project_path=None, return_df=False):
+
         self.insert_names_with_formulas_simple_bdp(name_list, field_dict, output_file=temp_excel_path)
         self.open_like_human_wait_and_save(temp_excel_path, final_excel_path,
                                       wait_seconds=max(int(len(name_list) * 0.02), 20))
-        out = self.save_bdp_excel_data(file_path=final_excel_path, save_pickle_dir=pickle_path)
+        out = self.save_bdp_excel_data(file_path=temp_excel_path, save_pickle_dir=pickle_path)
         if return_df:
             return out
 
