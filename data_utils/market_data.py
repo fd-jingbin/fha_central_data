@@ -7,19 +7,13 @@ import time
 import openpyxl
 import numpy as np
 import pandas as pd
-import psutil
 import win32com.client
 from datetime import date
 from typing import Any, List, Sequence
 import shutil, tempfile
 
 # Internal Imports
-import importlib as imp
 import data_config as da_cfg
-import data_utils.utils as da_ut
-
-for pkg in [da_cfg, da_ut]:
-    imp.reload(pkg)
 
 # endregion
 
@@ -332,12 +326,16 @@ class BbgExcelLoader:
         if return_df:
             return out
 
-    def save_bql_consensus_data_pickle(self, name_list, temp_excel_path, final_excel_path, pickle_path, return_df=False):
-        self.export_bql_consensus_rows(date.today(), name_list, filename=temp_excel_path)
+    def save_bql_consensus_data_pickle(self, name_list, temp_excel_path, final_excel_path, pickle_path, return_df=False, dt = None, project_path=None):
+        if project_path is None:
+            project_path = self.cfg.BBG_EXCEL_TEMP_FILE_DIR
+
+        dt = date.today() if dt is None else dt
+        self.export_bql_consensus_rows(dt, name_list, filename=temp_excel_path)
         self.open_like_human_wait_and_save(temp_excel_path, final_excel_path,
                                       wait_seconds=max(int(len(name_list) * 0.1), 20))
-        out = pd.read_excel(final_excel_path)
-        out.to_pickle(pickle_path)
+        out = pd.read_excel(str(os.path.join(project_path, temp_excel_path)))
+        out.to_pickle(str(os.path.join(project_path, pickle_path)))
         if return_df:
             return out
 
@@ -413,7 +411,7 @@ class BbgExcelLoader:
         if save_pickle_dir is not None:
             df_stacked.to_pickle(save_pickle_dir)
 
-        return df_stacke.dropna(axis=1, how="all")
+        return df_stacked.dropna(axis=1, how="all")
 
     def save_bds_to_structured_pickle(self, name_list, field_value, extra_params, n_space, temp_excel_path, final_excel_path,
                                       pickle_path, return_df=False):
