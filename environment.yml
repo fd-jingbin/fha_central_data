@@ -1,0 +1,23 @@
+name: fha_data
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pip
+  - pip:
+      # 科学计算 / 机器学习
+      - numpy==1.26.4
+      - pandas==2.2.3
+      - scipy==1.14.1
+      - scikit-learn==1.5.2
+      # files
+      - loguru==0.7.2
+      - openpyxl==3.1.5
+      - xlrd >= 2.0.1
+      # 测试
+      - pytest==9.0.2
+      - pandas-stubs==2.2.3.250308
+      # 其他
+      - psutil==7.2.1
+      - pywin32
