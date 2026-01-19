@@ -1,3 +1,5 @@
+from typing import List
+
 import data_utils.exposure_data as ex_ut
 import data_utils.market_data as mk_ut
 import data_config as da_cfg
@@ -8,6 +10,34 @@ for pkg in [da_cfg, ex_ut, mk_ut]:
 
 import faulthandler
 faulthandler.enable()
+
+
+{
+    'BDH':
+        {
+            'Ticker': List,
+            'Fields': {
+                "Value": "PX_LAST",
+                "Params": List
+            },
+            'StartDate': '2020-01-01',
+            'EndDate': '2026-01-16',
+        },
+    'BDS':
+        {
+            'Ticker': List,
+                        'Fields': {
+                "Value": "PX_LAST",
+                "Params": List
+            },
+        },
+    'BDP': {
+        'Ticker': List,
+        'Fields': List
+    },
+
+}
+
 
 out1 = mk_ut.BbgExcelLoader().save_bdh_to_structured_pickle(
     name_list=['USGG2YR INDEX', 'USGG10YR INDEX', 'XLP US EQUITY', 'XLY US EQUITY', 'NVDA US EQUITY'],
@@ -42,7 +72,7 @@ out3 = mk_ut.BbgExcelLoader().save_bdp_to_structured_pickle(
 
 out4 = mk_ut.BbgExcelLoader().save_bdh_to_structured_pickle(
     name_list=['AAPL US EQUITY', 'SPX INDEX', '6857 JP EQUITY'],
-    field_value='BEST_TARGET_PRICE',
+    field_value='BEST_PE_RATIO',
     extra_params=['BEST_FPERIOD_OVERRIDE', '1GBF'],
     start_date='2020-01-01',
     end_date='2026-01-16',

@@ -460,3 +460,69 @@ class MsfsData:
         new_df = pd.concat([hist_df, df], axis=0).reset_index(drop=True)
         new_df.to_pickle(os.path.join(self.cfg.EXPOSURE_DATA_DIR, f'{self.cfg.MSFS_RAW_DATA_PICKLE_NAME}.pkl'))
 
+
+class InternalAttributes:
+
+    def __init__(self, cfg=da_cfg):
+        self.cfg = cfg
+        self.enfusion_api = EnfusionData()
+        self.msfs_api = MsfsData()
+
+    def load_position_data(self, df=None, add_hist=False, le=None, refresh=True, hardcode_team=da_cfg.BOOK_RESTRUCTURE_DICT, hardcode_ticker=da_cfg.MULTI_LISTING_DICT):
+
+        def _apply_new_book_structure(_df):
+            return _df.assign(Book=lambda d: d.Book.replace(hardcode_team)).groupby(['Date', 'Book', 'Ticker'])[
+                ['NMVEnd', 'QuantityEnd', 'NMVStart', 'QuantityStart', 'GMVStart', 'GMVEnd',
+                 'TotalPnL']].sum().reset_index()
+
+        def _apply_underlying_clean(_df):
+            return _df.assign(Ticker=lambda d: d.Ticker.replace(hardcode_ticker)).groupby(['Date', 'Book', 'Ticker'])[
+                ['NMVEnd', 'QuantityEnd', 'NMVStart', 'QuantityStart', 'GMVStart', 'GMVEnd',
+                 'TotalPnL']].sum().reset_index()
+
+        if df is not None:
+            if hardcode_team is not None:
+                df = _apply_new_book_structure(df)
+            if hardcode_ticker is not None:
+                df = _apply_underlying_clean(df)
+            df = da_ut.add_internal_attributes(df)
+            return df
+
+        le = self.cfg.ENFUSION_LEGAL_ENTITY_FHA if le is None else le
+        fn = f'portfolio_data_with_hist_{le}' if add_hist else f'portfolio_data_no_hist_{le}'
+        file_dir = str(os.path.join(self.cfg.EXPOSURE_DATA_DIR, f'{fn}.pkl'))
+        if not refresh:
+            if da_ut.exist_file(file_dir):
+                df = pd.read_pickle(file_dir)
+                return df
+
+        df = self.enfusion_api.load_final_enfusion_data(le=le)
+        if hardcode_team is not None:
+            df = _apply_new_book_structure(df)
+        if hardcode_ticker is not None:
+            df = _apply_underlying_clean(df)
+        if add_hist:
+            df_hist = self.msfs_api.load_untouched_hist_data()[df.columns]
+            df = pd.concat([df_hist, df], axis=0).reset_index(drop=True)
+
+        df = da_ut.add_internal_attributes(df)
+        df.to_pickle(file_dir)
+
+        return df
+
+
+class InternalDataLoader:
+
+    def __init__(self, cfg=da_cfg):
+        self.cfg = cfg
+        self.enfu_api = EnfusionData()
+        self.inta_api = InternalAttributes()
+
+    def load_enfusion_data_processed(self, le=None):
+        return self.enfu_api.load_processed_full_le(le=le)
+
+    def load_enfusion_data_raw(self):
+        return self.enfu_api.load_raw_data()
+
+    def load_processed_exposure_data(self, df=None, add_hist=False, le=None, refresh=True):
+        return self.inta_api.load_position_data(df=df, add_hist=add_hist, le=le, refresh=refresh)

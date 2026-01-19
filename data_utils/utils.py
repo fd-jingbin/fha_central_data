@@ -159,6 +159,10 @@ def exist_file(file_path):
     return Path(file_path).exists()
 
 
+def exist_create_folder(folder_path):
+    Path(folder_path).mkdir(parents=True, exist_ok=True)
+
+
 def find_avail_files(folder_path, keywords, file_format):
     avail_files = glob.glob(os.path.join(folder_path, f"{keywords}*.{file_format}"))
     if not avail_files:
@@ -197,5 +201,191 @@ def shift_df_date(df, N, ticker_col='Ticker', date_col='Date'):
     sign = '-' if N > 0 else '+'
     # Compute price N rows back using groupby and shift
     df[f'Date_T{sign}{abs(N)}'] = df.groupby(ticker_col)[date_col].shift(N)
+
+    return df
+
+
+def age_calculation(df, action_col, pnl_col='TotalPnL', ticker_col='Ticker', date_col='Date'):
+    d = df.sort_values([ticker_col, date_col]).reset_index(drop=True).copy()
+
+    out = np.empty(len(d), dtype=float)
+
+    for ticker, sub in d.groupby(ticker_col, sort=False):
+        action = 0.0
+        new_actions = []
+
+        for a, pnl in zip(sub[action_col].to_numpy(), sub[pnl_col].to_numpy()):
+            if pd.notna(a):
+                action = float(a)
+            elif pnl != 0:
+                action += 1.0
+            new_actions.append(action)
+
+        out[sub.index] = new_actions
+
+    d[action_col] = out
+    return d
+
+
+def add_age_and_specific_count_id(
+        df,
+        cycle_start_criteria_col,
+        cycle_start_criteria_values,
+        cycle_term_structure_col,
+        reset_cycle_by,
+        cycle_name,
+        start_from=0,
+        add_id=True):
+
+    df = df \
+        .pipe(lambda d: d.assign(cycle_term_structure_col=np.where(d[cycle_start_criteria_col].isin(cycle_start_criteria_values),
+                                              start_from, np.nan))) \
+        .rename(columns={'cycle_term_structure_col': cycle_term_structure_col}) \
+        .pipe(lambda d: age_calculation(d, cycle_term_structure_col))
+
+    if add_id:
+        df = df.pipe(lambda d: d.assign(CycleId=np.where(d[cycle_start_criteria_col].isin(cycle_start_criteria_values), 1, np.nan)) \
+             .sort_values(by='Date')) \
+             .pipe(lambda d: d.assign(CycleId=d.groupby(reset_cycle_by).CycleId.transform(
+            lambda x: x.notna().cumsum().sub(0).where(x.notna())))) \
+             .pipe(lambda d: d.assign(CycleId=d.groupby(reset_cycle_by).CycleId.ffill().fillna(1))) \
+             .pipe(lambda d: d.assign(UniqueGroup=d[reset_cycle_by] + '_' + d.CycleId.astype(int).astype(str))) \
+             .rename(columns={'CycleId': f'{cycle_name}Id', 'UniqueGroup': cycle_name})
+    return df
+
+
+def add_internal_attributes(df):
+    # 预先过滤数据，减少后续计算量
+    df = df[(df.NMVStart != 0) | (df.NMVEnd != 0)].copy()
+
+    # --- 1. 基础列计算 (向量化) ---
+    df['QuantityStart'] = df['QuantityStart'].astype(float)
+    df['QuantityEnd'] = df['QuantityEnd'].astype(float)
+
+    # Side 计算
+    cond_start_0 = df['NMVStart'] == 0
+    cond_end_pos = df['NMVEnd'] > 0
+    cond_start_pos = df['NMVStart'] > 0
+
+    df['Side'] = np.where(cond_start_0,
+                          np.where(cond_end_pos, 'Long', 'Short'),
+                          np.where(cond_start_pos, 'Long', 'Short'))
+
+    # TotalReturn 计算
+    denom = np.where(df['GMVStart'] == 0, df['GMVEnd'], df['GMVStart'])
+    df['TotalReturn'] = np.where(denom != 0, df['TotalPnL'] / denom, 0.0)
+
+    # --- 2. Groupby Transform 优化 ---
+    g_date_book = df.groupby(['Book', 'Date'])['GMVEnd']
+    g_date_book_side = df.groupby(['Date', 'Book', 'Side'])['GMVEnd']
+
+    sum_gmv_date_book = g_date_book.transform('sum')
+    sum_gmv_date_book_side = g_date_book_side.transform('sum')
+
+    # Position Size
+    df['PositionSize'] = df['GMVEnd'] / sum_gmv_date_book
+    df['PositionSizeSide'] = df['GMVEnd'] / sum_gmv_date_book_side
+
+    # ENP (Effective N) 计算
+    def calc_enp_vectorized(x):
+        return (x.sum() ** 2) / (np.sum(x ** 2) + 1e-12)
+
+    df['ENP'] = g_date_book.transform(calc_enp_vectorized)
+    df['ENPSide'] = g_date_book_side.transform(calc_enp_vectorized)
+
+    # ConvLvl 计算
+    inv_enp = 1.0 / df['ENP']
+    inv_enp_side = 1.0 / df['ENPSide']
+
+    df['ConvLvl'] = np.select(
+        [df['PositionSize'] > inv_enp, df['PositionSize'] < (0.5 * inv_enp)],
+        ['Large', 'Small'],
+        default='Medium'
+    )
+
+    df['ConvLvlSide'] = np.select(
+        [df['PositionSizeSide'] > inv_enp_side, df['PositionSizeSide'] < (0.5 * inv_enp_side)],
+        ['Large', 'Small'],
+        default='Medium'
+    )
+
+    # --- 3. 核心修复：向量化 calculate_position_change ---
+    q_s = df['QuantityStart'].values
+    q_e = df['QuantityEnd'].values
+
+    c_start_0 = (q_s == 0)
+    c_start_not_0 = ~c_start_0
+
+    # 【修正处】统一变量名为 cond_flip
+    cond_flip = ((q_s < 0) & (q_e > 0)) | ((q_s > 0) & (q_e < 0))
+
+    pos_chg = np.zeros_like(q_s)
+
+    with np.errstate(divide='ignore', invalid='ignore'):
+        pos_chg = np.where(c_start_not_0, (q_e / np.where(c_start_not_0, q_s, 1.0)) - 1, 0.0)
+
+    # 这里使用修正后的 cond_flip
+    pos_chg = np.where(cond_flip, 1.0, pos_chg)
+    pos_chg = np.where(c_start_0 & (q_e != 0), np.nan, pos_chg)
+
+    df['PositionChange'] = pos_chg
+
+    # --- 4. 核心修复：向量化 calculate_idea_type ---
+    cond_init = (q_s == 0) & (q_e != 0)
+    cond_close = (q_s != 0) & (q_e == 0)
+    # cond_flip 已定义
+    cond_intraday = (q_s == 0) & (q_e == 0)
+
+    abs_s = np.abs(q_s)
+    abs_e = np.abs(q_e)
+    cond_shrink = abs_s > abs_e
+    cond_grow = abs_s < abs_e
+
+    choices = [
+        (cond_init, 'Init'),
+        (cond_close, 'Close'),
+        (cond_flip, 'Flip'),  # 这里之前报错，现在 cond_flip 已正确定义
+        (cond_intraday, 'Intraday'),
+        (cond_shrink, 'Shrink'),
+        (cond_grow, 'Grow')
+    ]
+
+    conds = [c for c, v in choices]
+    vals = [v for c, v in choices]
+
+    df['IdeaType'] = np.select(conds, vals, default=None)
+
+    # --- 5. 后续 Age 计算 ---
+    outputs = []
+    for book, sub in df.groupby('Book'):
+        out = add_age_and_specific_count_id(
+            sub, 'IdeaType', ['Init'], 'PositionAge', 'Ticker', 'TradeTicker', 0)
+        outputs.append(out)
+
+    df = pd.concat(outputs, ignore_index=True)
+
+    outputs = []
+    for book, sub in df.groupby('Book'):
+        out = add_age_and_specific_count_id(
+            sub, 'IdeaType', ['Init', 'Grow', 'Shrink', 'Flip'], 'IdeaAge', 'TradeTicker', 'TradeIdeaTicker', 0)
+        outputs.append(out)
+
+    df = pd.concat(outputs, ignore_index=True)
+
+    # --- 6. 最终累计计算 ---
+    df = df.sort_values(by='Date')
+
+    g_book_trade = df.groupby(['Book', 'TradeTicker'])
+    g_book_idea = df.groupby(['Book', 'TradeIdeaTicker'])
+
+    df['PosCumSumRt'] = g_book_trade['TotalReturn'].cumsum()
+    df['IdeaCumSumRt'] = g_book_idea['TotalReturn'].cumsum()
+    df['IdeaState'] = g_book_trade['IdeaType'].ffill()
+
+    df['MaxPosCumSumRt'] = g_book_trade['PosCumSumRt'].cummax()
+    df['MaxIdeaCumSumRt'] = g_book_idea['IdeaCumSumRt'].cummax()
+
+    df['PosDDRt'] = df['PosCumSumRt'] - df['MaxPosCumSumRt']
+    df['IdeaDDRt'] = df['IdeaCumSumRt'] - df['MaxIdeaCumSumRt']
 
     return df

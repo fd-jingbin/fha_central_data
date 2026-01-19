@@ -16,9 +16,16 @@ dependencies:
       - openpyxl==3.1.5
       - xlrd >= 2.0.1
       - xlsxwriter==3.2.9
+      - boto3==1.42.30
+      - botocore==1.42.30
       # 测试
       - pytest==9.0.2
       - pandas-stubs==2.2.3.250308
       # 其他
       - psutil==7.2.1
       - pywin32
+      - jinja2==3.1.6
+      - paramiko==4.0.0
+      - tornado==6.5.4
+      - pyarrow==23.0.0
+      - fastparquet==2025.12.0

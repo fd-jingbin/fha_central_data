@@ -300,7 +300,7 @@ class BbgExcelLoader:
         return data
 
     def save_bdh_to_structured_pickle(self, name_list, field_value, extra_params, start_date, end_date, temp_excel_path,
-                                      final_excel_path, pickle_path, return_df=False, batch_size=150, project_path=None):
+                                      final_excel_path, pickle_path, return_df=False, batch_size=200, project_path=None):
 
         if project_path is None:
             project_path = self.cfg.BBG_DEFAULT_PICKLE_DIR
@@ -309,13 +309,10 @@ class BbgExcelLoader:
         out_list = []
 
         for idx, tickers in enumerate(list_of_tickers):
-            print('insert formulas')
             self.insert_names_and_formulas_simple_bdh(tickers, field_value, start_date, end_date, extra_params,
                                                       filename=temp_excel_path)
-            print('open and wait')
             self.open_like_human_wait_and_save(temp_excel_path, final_excel_path,
                                           wait_seconds=max(int(len(tickers) * 0.1), 30))
-            print('clean and save')
             self.clean_horizontal_listed_bdh_data_by_ticker(value_type_str=field_value, excel_file_dir=temp_excel_path,
                                                        save_pickle_dir=f'{pickle_path}'.replace('.pkl',f'{idx}.pkl'))
             out_list.append(pd.read_pickle(str(os.path.join(project_path, f'{pickle_path}'.replace('.pkl',f'{idx}.pkl')))))

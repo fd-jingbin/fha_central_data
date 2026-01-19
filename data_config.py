@@ -1,3 +1,10 @@
+# S3 Config
+
+
+
+#
+
+
 # region Enfusion Config
 
 ENFUSION_EXCEL_AUTO_SAVE_DIR = r'C:\Python\data\excel\enfusion_exposure_report'
@@ -36,7 +43,12 @@ ENFUSION_DATE_COL_DICT = {
 # region Book Structure Related
 
 BOOK_RESTRUCTURE_DICT = {'SS': 'SSS', 'FHCIPO': 'FHC', 'QXIPO': 'QX', 'GXIPO': 'GX'}
-
+MULTI_LISTING_DICT = {'BABA US EQUITY': '9988 HK EQUITY',
+                      '688331 CH EQUITY': '9995 HK EQUITY',
+                      '6031 HK EQUITY': '600031 CH EQUITY',
+                      '2050 HK EQUITY': '002050 CH EQUITY',
+                      'ASML NA EQUITY': 'ASML US EQUITY',
+                      'LOGN SW EQUITY': 'LOGI US EQUITY'}
 # endregion
 
 
@@ -70,19 +82,21 @@ TABLEAU_DATA_DIR = r'C:\Python\data\tableau_data'
 
 
 # region BBG API Config
+START_DATE = '2015-01-01'
+
 BBG_EXCEL_TEMP_FILE_DIR = r'C:\Python\data\market_data\bbg_excel_temp'
 BBG_DEFAULT_PICKLE_DIR = r'C:\Python\data\market_data'
 FIGI_MAPPING_PKL_FN = 'figi_mapping.pkl'
 
 BDH_DATA_PKL_NAMES = {
-    'BEST_TARGET_PRICE': 'TP',
-    'BEST_PE_RATIO': 'PE',
-    'PX_OPEN': 'OPEN',
+    'BETA_RAW_OVERRIDABLE': 'BETA',
     'PX_LAST': 'CLOSE',
+    'PX_VOLUME': 'VOLUME',
+    'PX_OPEN': 'OPEN',
     # 'PX_HIGH': 'HIGH',
     # 'PX_LOW': 'LOW',
-    # 'PX_VOLUME': 'VOLUME',
-    'BETA_RAW_OVERRIDABLE': 'BETA',
+    # 'BEST_TARGET_PRICE': 'TP',
+    # 'BEST_PE_RATIO': 'PE',
 }
 
 BBG_EARN_FIELD = 'EARN_ANN_DT_TIME_HIST_WITH_EPS'
@@ -112,5 +126,61 @@ STOCK_IMPLIED_CALENDAR_PICKLE_FN = 'CALENDAR'
 
 IDX_USD_PICKLE_FN = 'INDEX_USD'
 IDX_PICKLE_FN = 'INDEX'
+
+MKT_INDEX_MAPPING = {
+    'CN': 'SHSZ300 INDEX',
+    'HK': 'HSI INDEX',
+    'GB': 'UKX INDEX',
+    'US': 'SPX INDEX',
+    'JP': 'NKY INDEX',
+    'CL': 'SPX INDEX', # CHILE
+    'NL': 'SXXP INDEX',
+    'IL': 'SPX INDEX',
+    'AU': 'AS51 INDEX',
+    'DE': 'DAX INDEX',
+    'TW': 'TWSE INDEX',
+    'CH': 'SXXP INDEX',
+    'KR': 'KOSPI INDEX',
+    'FR': 'CAC INDEX',
+    'SG': 'ASEAN40 INDEX',
+    'CA': 'SPX INDEX',
+    'IT': 'SXXP INDEX',
+    'ES': 'SXXP INDEX',
+    'LU': 'SXXP INDEX',
+    'VN': 'VNINDEX INDEX',
+    'ID': 'ASEAN40 INDEX',
+    'TH': 'ASEAN40 INDEX',
+    'PH': 'ASEAN40 INDEX',
+    'MO': 'SHSZ300 INDEX',
+    'JE': 'SPX INDEX'
+}
+
+MKT_INDEX_MAPPING_HEDGE = {
+    'CN': 'XIN9I INDEX',
+    'HK': 'XIN9I INDEX',
+    'GB': 'SX5E INDEX',
+    'US': 'SPX INDEX',
+    'JP': 'NKY INDEX',
+    'CL': 'SPX INDEX', # CHILE
+    'NL': 'SX5E INDEX',
+    'IL': 'SX5E INDEX',
+    'AU': 'SPX INDEX',
+    'DE': 'SX5E INDEX',
+    'TW': 'SPX INDEX',
+    'CH': 'SX5E INDEX',
+    'KR': 'KOSPI2 INDEX',
+    'FR': 'SX5E INDEX',
+    'SG': 'ASEAN40 INDEX',
+    'CA': 'SPX INDEX',
+    'IT': 'SX5E INDEX',
+    'ES': 'SX5E INDEX',
+    'LU': 'SX5E INDEX',
+    'VN': 'ASEAN40 INDEX',
+    'ID': 'ASEAN40 INDEX',
+    'TH': 'ASEAN40 INDEX',
+    'PH': 'ASEAN40 INDEX',
+    'MO': 'XIN9I INDEX',
+    'JE': 'SPX INDEX'
+}
 
 # endregion

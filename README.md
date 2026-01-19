@@ -1,5 +1,5 @@
 # fha_central_data
-To handle initial data fetching and cleaning
+To handle initial data fetching, cleaning, and standard processing
 
 
 # install virtual environment
