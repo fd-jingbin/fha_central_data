@@ -101,6 +101,7 @@ def daily_exposure_market_data_refresh():
     refresh_exposure_data()
     logging.info('Refreshing Market data...')
     refresh_market_data()
-
+    logging.info('Saving Data to S3...')
+    save_refreshed_data()
 
 daily_exposure_market_data_refresh()

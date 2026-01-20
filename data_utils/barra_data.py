@@ -181,7 +181,7 @@ class BarraDataLoader:
         with zipfile.ZipFile(zip_path, 'r') as zipf:
             print(f'Processing latest figi mapping...')
             for file_name in zipf.namelist():
-                match = re.fullmatch("ASIA_FIGI_Asset_ID\.(\d{8})", Path(file_name).name)
+                match = re.fullmatch("ASIA_FIGI_Asset_ID\\.(\\d{8})", Path(file_name).name)
                 if match:
                     df = self.read_flat_file(zipf.open(file_name), columns=['Barrid', 'AssetIDType', 'AssetID', 'StartDate', 'EndDate'], delimiter='|')
                     df.to_parquet(os.path.join(self.processed_dir, 'figi_mapping.parquet'))

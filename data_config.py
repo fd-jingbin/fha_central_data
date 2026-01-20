@@ -1,8 +1,4 @@
-# S3 Config
-
-
-
-#
+import os
 
 
 # region Enfusion Config
@@ -83,6 +79,9 @@ TABLEAU_DATA_DIR = r'C:\Python\data\tableau_data'
 
 # region BBG API Config
 START_DATE = '2015-01-01'
+
+OPENFIGI_API_KEY = os.environ.get("OPENFIGI_API_KEY", "b1c361a4-9a52-4d7b-ba13-d2c014e43399")
+OPENFIGI_BASE_URL = "https://api.openfigi.com/v3/mapping"
 
 BBG_EXCEL_TEMP_FILE_DIR = r'C:\Python\data\market_data\bbg_excel_temp'
 BBG_DEFAULT_PICKLE_DIR = r'C:\Python\data\market_data'

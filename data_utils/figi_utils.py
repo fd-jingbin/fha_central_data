@@ -4,8 +4,8 @@ import os
 import pandas as pd
 from tornado.httpclient import HTTPError
 
-import data_modules.data_config as da_cfg
-import cb_utilities.file_utils as fl_ut
+import data_config as da_cfg
+import data_utils.utils as fl_ut
 
 
 def _api_call(payload):

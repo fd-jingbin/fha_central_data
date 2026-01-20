@@ -1,18 +1,17 @@
+from __future__ import annotations
+
 import gzip
 import os
 import pickle
 import tempfile
-from typing import Any, Optional
+from typing import Optional, Any
 
 import boto3
-from boto3.s3.transfer import TransferConfig
 from botocore.config import Config
 
 
 class S3DataFrameStore:
-    """
-    存/取 pandas DataFrame
-    """
+    """Upload/Download pandas DataFrame to/from S3 with pickle+gzip."""
 
     def __init__(
         self,
@@ -20,13 +19,14 @@ class S3DataFrameStore:
         prefix: str = "",
         *,
         region_name: Optional[str] = None,
+        profile_name: Optional[str] = None,
         gzip_compress: bool = True,
     ) -> None:
         self.bucket = bucket
         self.prefix = prefix.strip("/")
         self.gzip_compress = gzip_compress
 
-        session = boto3.session.Session(region_name=region_name)
+        session = boto3.Session(profile_name=profile_name, region_name=region_name)
         self.s3 = session.client(
             "s3",
             config=Config(
@@ -36,38 +36,39 @@ class S3DataFrameStore:
             ),
         )
 
-        # 让大文件更稳：超过 64MB 自动 multipart
-        MB = 1024 * 1024
-        self.transfer_cfg = TransferConfig(
-            multipart_threshold=64 * MB,
-            multipart_chunksize=64 * MB,
-            max_concurrency=4,
-            use_threads=True,
-        )
+    def _key(self, path: str) -> str:
+        """path is like 'fha/test/df_a' or 'fha/test/df_a.pkl.gz'"""
+        path = path.strip("/")
 
-    def _key(self, name: str) -> str:
-        name = name.strip().replace("\\", "/")
-        ext = "pkl.gz" if self.gzip_compress else "pkl"
-        key = f"{name}.{ext}" if not name.endswith(f".{ext}") else name
-        return f"{self.prefix}/{key}" if self.prefix else key
+        # normalize extension
+        if self.gzip_compress:
+            if not path.endswith(".pkl.gz"):
+                path += ".pkl.gz"
+        else:
+            if not path.endswith(".pkl"):
+                path += ".pkl"
 
-    def save_df(self, name: str, df: Any, *, overwrite: bool = True) -> str:
-        key = self._key(name)
+        return f"{self.prefix}/{path}" if self.prefix else path
+
+    def upload_df(self, path: str, df: Any, *, overwrite: bool = True) -> str:
+        key = self._key(path)
 
         if not overwrite:
-            # 轻量检查存在性
+            # light existence check
             try:
                 self.s3.head_object(Bucket=self.bucket, Key=key)
                 raise FileExistsError(f"s3://{self.bucket}/{key}")
-            except self.s3.exceptions.NoSuchKey:
-                pass
             except Exception as e:
-                # head_object 不同错误码表现不一致，简单起见：不存在就继续，其他就抛
-                if "404" not in str(e) and "NotFound" not in str(e):
-                    raise
+                # if it's not "exists", continue; otherwise re-raise
+                msg = str(e)
+                if "404" not in msg and "NotFound" not in msg and "NoSuchKey" not in msg:
+                    # could be AccessDenied etc.
+                    pass
 
+        # write to temp file (stable for big df)
+        suffix = ".pkl.gz" if self.gzip_compress else ".pkl"
         with tempfile.TemporaryDirectory() as td:
-            local_path = os.path.join(td, "df_dump.pkl" + (".gz" if self.gzip_compress else ""))
+            local_path = os.path.join(td, "df" + suffix)
 
             if self.gzip_compress:
                 with gzip.open(local_path, "wb") as f:
@@ -78,18 +79,12 @@ class S3DataFrameStore:
                     pickle.dump(df, f, protocol=pickle.HIGHEST_PROTOCOL)
                 extra = {"ContentType": "application/octet-stream"}
 
-            self.s3.upload_file(
-                Filename=local_path,
-                Bucket=self.bucket,
-                Key=key,
-                ExtraArgs=extra,
-                Config=self.transfer_cfg,
-            )
+            self.s3.upload_file(local_path, self.bucket, key, ExtraArgs=extra)
 
         return f"s3://{self.bucket}/{key}"
 
-    def load_df(self, name: str) -> Any:
-        key = self._key(name)
+    def download_df(self, path: str) -> Any:
+        key = self._key(path)
         resp = self.s3.get_object(Bucket=self.bucket, Key=key)
         body = resp["Body"]
 
@@ -101,3 +96,19 @@ class S3DataFrameStore:
                 return pickle.load(body)
         finally:
             body.close()
+
+#
+# import pandas as pd
+#
+# store = S3DataFrameStore(
+#     bucket="fengheai-jingbin-data",
+#     prefix="fha/test",              # 可选：统一前缀
+#     region_name="ap-southeast-1",   # 建议写上 bucket 所在 region
+#     # profile_name="jingbin",       # 如果你用 profile
+# )
+#
+# df = pd.DataFrame({"a":[1,2], "b":[3,4]})
+#
+# uri = store.upload_df("df_a", df)      # -> s3://bucket/fha/test/df_a.pkl.gz
+# df2 = store.download_df("df_a")
+# print(uri, df2.head())
