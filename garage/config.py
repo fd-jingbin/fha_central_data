@@ -1,150 +1,11 @@
 # region File Name and Path
-STOCK_CATALYST_FOLDER = r"C:\Python\data\agent\catalysts"
-STOCK_CATALYST_PICKLE_FN = "catalysts.pkl"
-
 INDUSTRY_ANALYSIS_FOLDER = r"C:\Python\data\agent\industry_analysis"
 INDUSTRY_PICKLE_FN = "industry_analysis.pkl"
-
-STOCK_NEWS_FOLDER = r"C:\Python\data\agent\stock_news"
-STOCK_NEWS_PICKLE_FN = "stock_news.pkl"
-
-STOCK_THEME_FOLDER = r"C:\Python\data\agent\stock_theme"
-STOCK_THEME_PICKLE_FN = "stock_theme.pkl"
-
-STOCK_FUNDAMENTALS_FOLDER = r"C:\Python\data\agent\stock_fundamentals"
-STOCK_FUNDAMENTALS_PICKLE_FN = "stock_fundamentals.pkl"
-
-MACRO_ANALYSIS_FOLDER = r"C:\Python\data\agent\macro_analysis"
-
 # endregion
 
 # region Prompts
 
-STOCK_CLASSIFICATION_PROMPT = """
-### 角色设置
-你是一个全球顶级股票对冲基金的首席风险官，你的任务是结合现在的市场叙事和对股票业务的理解，指出他们的风险来源与理由，但是不要硬蹭theme。
 
-### 详细任务
-请分析 {STOCK_TICKER_PLACEHOLDER}。
-并且assign给这个股票以下风险主题，可以多选（比如MTSI就是又有AI又有Defense，那么就要分两条输出），但是要是主要的市场叙事，如果一个都不符合就放Others，否则没必要加others。
-另外Theme一定不要为了凑而凑，我只需要Defense, Memory, AI, Japan, Others。Japan是和日本市场Beta有关的，所以几乎所有JP EQUITY的股票都可以打一个Japan标签。比如9988 HK就不属于任何一个，直接Others就行，1810 HK，002475 CH这种也是，Others。
-总之不要沾一点点就放了theme，要是那种这个theme跌就真的有风险那种。比如DELL,HPQ, WRD，GEHC，603920 CH就不是AI theme，希望你能理解。
-
-上次运行结果如下，请参考 (若无记录将是空白string)：
-{STOCK_THEME_PLACEHOLDER}
-
-最后输出严格的json格式：
-
-[{{
-  "Date": "YYYY-MM-DD",
-  "Ticker": "e.g. MTSI US EQUITY",
-  "Theme": "Defense/Memory/AI/Japan/Others (一条只放一个，如果有多个theme请再贴一条)",
-  "Rationale": "不超过50个字简单说说为什么这个股票有这个theme (这里不要放任何URL Source！！！这里不要放任何URL Source！！！这里不要放任何URL Source！！！这里不要放任何URL Source！！！这里不要放任何URL Source！！！这里不要放任何URL Source！！！这里不要放任何URL Source！！！)",
-  "Source": "所有的URL Source放在这里"
-}},
-...]
-
-"""
-
-
-STOCK_CATALYST_PROMPT = """
-
-### 核心任务（优先级最高）
-你是一名全球顶级对冲基金的买方股票基本面分析师。
-
-请你针对 {STOCK_TICKER_PLACEHOLDER}，
-在时间区间：{START_DATE_PLACEHOLDER} 到 {END_DATE_PLACEHOLDER}，
-
-**识别所有“可能会影响股价的 Catalyst 事件”**。
-
-Catalyst 的定义：
-- 必须在当天之前知道未来会发生，比如已经提前安排好的行业会议，公司业绩，开发者大会等等，我不希望look forward bias，不是刚发生的新闻，是至少一周之前就知道未来有的事情
-- 可以是（包括但绝不限于）宏观（数据/央行会议/政府/政策etc），行业（行业相关大会/路线/政策，etc），公司（财报，解禁，管理层，官司开庭时间，合作，etc）等等事件 （财报肯定不能缺哦）
-
----
-
-### 研究约束框架（用于解释，不是为了展示）
-你必须使用 5M3T3D 框架来解释每一个 Catalyst 的**传导机制**：
-
-5M：
-- M1 TAM
-- M2 Market Share
-- M3 Margin
-- M4 Business Model
-- M5 Management
-
-时间维度：
-- 仅允许使用 T1（0–3m）和 T2（3–6m）
-- 不要展开 T3（18m+）的长期叙事，除非是历史性改写一些结构或者逻辑的东西
-
-股价 Driver：
-- D1：复利 / EPS Roll-up
-- D2：预期差的实质化（rerating）
-- D3：估值区间 / 情绪钟摆
-
----
-
-### 输出格式（JSON，仅输出结果）
-请输出一个 JSON 数组，每个元素代表一个 Catalyst：
-
-[{{
-  "Date": "YYYY-MM-DD",
-  "DateType": "若为预期事件，请注明 Estimated。若为确定事件，请注明Confirmed"  
-  "Catalyst": "一句话描述，必须具体、可交易",
-  "Mechanism": "明确写清：影响哪些 M，在 T1 还是 T2，通过 D1/D2/D3 传导.用这个格式：[M1, M2] - [T1, T2] - [D2]",
-  "Type": "宏观 / 行业 / 政策 / 公司 / 财报",
-  "Rationale": "为什么这个事件会使市场修正预期或估值",
-  "Importance": "0-10（在该 Driver 维度下的股价影响强度）",
-  "History": "历史上类似事件如何影响过该股或同类标的（方向 + 幅度 + 持续时间）",
-}},
-...]
-
-"""
-
-SINGLE_STOCK_NEWS_IMPACT = """
-
-### 角色设置
-你是一个event driven的全球顶级股票对冲基金的分析师，极其擅长归纳推理，逻辑思考。
-你知道股票会受到以下这些因素边际变化的影响：
-5M：
-- M1 TAM
-- M2 Market Share
-- M3 Margin
-- M4 Business Model
-- M5 Management
-并且通过以下归因反应到股价：
-3D：
-- D1：复利 / EPS Roll-up
-- D2：预期差的实质化（rerating）
-- D3：估值区间 / 情绪钟摆
-
-### 任务设置
-你的任务是搜索过去三天关于{STOCK_TICKER_PLACEHOLDER}的所有重要新闻和重大事件（但是要注意价格变动本身不是新闻，而是会影响5M的事件或者数据或者新闻才是重要的，宁缺毋滥），思考这些事情会怎么影响股价。尤其是需要参考： 
-1. 同行业其他类似公司股票过去遇到这些事情的后续股价走势
-2. 改公司股票过去遇到这些事情的后续股价走势
-3. 结合之前发生的这些事情时候其他的一些影响因素，对比和这一次有什么不一样
-
-最后给出你对未来的判断：
-[{{
-  "Date": "YYYY-MM-DD",
-  "Event": "简短的事件描述",
-  "Direction": 数字1或0或-1（代表未来股价上涨，股价横盘，股价下跌）,
-  "Magnitude": "可能的%幅度（未来股价上涨或下跌的%，不包括已经price in的部分）",
-  "Duration": "持续时间（交易日/天）",
-  "Mechanism": "明确写清：影响哪些 M，通过哪些D 传导，可以用这个格式样例：[M1, M2] - [D2]"
-  "Reasoning": "简明写清楚为什么这个事件（5M3D）会使股价未来发生这样的变化（方向，时间，空间），如果有的话以史为鉴发生过什么",
-  "Confidence": "0-100，表明你对自己的分析有多大信心",
-  "Source": "来源URL"
-  }},]
-
-如果没有的话，输出一个空的list json:
-[]
-注意宁缺毋滥
-"""
-
-INDUSTRY_DESIGN = """
-
-"""
 
 INDUSTRY_ASK = """
 你是{REGION_PLACEHOLDER}市场的top-down 股票对冲基金行业策略研究员。我们用统一框架评估{INDUSTRY_PLACEHOLDER}并形成子行业多空建议。 
@@ -201,9 +62,7 @@ Step 3：交易结论
 
  
 输出格式：最后只输出一个json (JSON ONLY!)，每个string尽量bullet form。
-***注意注意再注意！！！所有的引用和reference的URL都放在“使用的URL链接引用”那一栏，别的地方不要有URL引用***
-***注意注意再注意！！！所有的引用和reference的URL都放在“使用的URL链接引用”那一栏，别的地方不要有URL引用***
-***注意注意再注意！！！所有的引用和reference的URL都放在“使用的URL链接引用”那一栏，别的地方不要有URL引用***
+
 OUTPUT FORMAT (JSON ONLY, NO URL!!!) 
 [
     {{ 
@@ -223,88 +82,6 @@ OUTPUT FORMAT (JSON ONLY, NO URL!!!)
 ]
 """
 
-
-SINGLE_STOCK_5M3T3D = """
-
-### 角色设置
-你是一个全球顶级对冲基金的股票基本面分析师，你在分析{STOCK_TICKER_PLACEHOLDER}这一个股票。
-
-你擅长的研究框架是5M3T3D：
-通过 5个M 看本质，透过本质看未来的表象。股价，盈利都是外在表象，背后是有内在规律决定的，行业内在规律由 3M 决定的。这样思考的速度才能超越市场。
-3个M是把“ROE/利润的变化”关进房间（可边界化的原因分解）。3个M 不是行业报告目录，而是解释ROE/COE变化来源的“可约束分解法”，防止叙事无限外延：
-o M1 TAM：蛋糕上限/下限与弹性（空间边界、需求可塑性）。
-o M2 Share：份额可得性与稳定性（竞争格局、替代与进入壁垒）。
-o M3 Margin：利润率与成本结构（供需、价格传导、成本曲线、产能周期；最常见的周期与竞争传导路径）。
-o M4 Business Model：赚钱机制、规模效应/网络效应、再投资效率、护城河如何形成/如何被破坏（决定“高 ROE 是否可复利”）。
-o M5 Management：资本配置、激励与执行（决定好模式能否持续兑现；拐点出现时公司如何应对）。
-每个M可以思考T1, T2, T3不同时间维度上的影响：
-- T1（0–3m）：短期扰动与情绪波动最密集，很多所谓预期差只是噪音或交易拥挤的回摆。
-- T2（3–18m）：业绩与一致预期修正的主战场；职业投资者往往必须在此区间“认真管理噪音”。
-- T3 (18m+)：结构与复利的战场，决定护城河与资本回报是否可持续（ROE的长期路径）。
-由5M3T 推导 D1/D2/D3 (股价Driver)
--D1 = Roll-up / 复利（EPS的Rollup）
-o “时间的价值”：只要商业模式与护城河成立，高 ROE 与现金创造会自然推高价值。
-o 可持续性、复利机制是否成立、是否值得长期持有；D1 的力量主要在 T2/T3 兑现。要研究透彻高 ROE 的护城河是什么，高 ROE 为什么可持续，背后的生意模式是什么，如果高成长背后的核心驱动是什么？
-o 可用“是否像巴菲特愿意长期持有的生意”来检验 D1 的内涵（生意质量、护城河、资本配置纪律）。
-o D1 可以理解为 ROE 或者 CAGR，偏价值就是看 ROE，偏成长就是 CAGR。ROE 要看护城河，CAGR 要看 M1，M2，M3 的确定性是否支撑 CAGR。
--D2= 预期差的“实质化”/ 非线性变化（常触发 rerating）
-o 不是“我和市场看法不一样”就算 D2；真正的 D2 来自 5M 的变化导致ROE/FCF 路径发生非线性偏移（上修/下修），并逐步迫使一致预期修正。
-o 灵魂三问：多大（幅度）/多快（速度）/多长（持续性）。
-o D2 是双刃剑：它既能证明/强化 D1（或证伪 D1），也容易让研究者“一叶障目”，忽略 D1 地基或 D3 已经把变化 priced-in。
-o Think different 才能看清 D2，但是不是让你和市场对着干，不是让你和 consensus对着干，是做出 smart choice，有三点：更多的搜索研究，严格的框架，有智慧的推导。
-o 周期语境下的 D2：关键在“方向 + 位置”。靠近周期转换段时确定性弱（更像与市场博弈）；周期中段确定性更强。
-o 对于抓 D2 投资的假设一定是源于大概率事件。D2 的来源是结构或者周期，结构是你和别人观点不一样 Yes vs No，周期是你判断一些事情持续时间比consensus 长或者短，程度高或者低，所以这个consensus 需要把握好 price in 了多少，找到市场 consensus 错误的假设，需要你大量的掌握信息。
--D3 = Range / 估值钟摆（估值的摆动 + range 漂移）
-o D3 讨论“现在价格处在情绪钟摆哪一端”以及“钟摆长度/锚点是否变化”。
-o 两层含义：1) range 内摆动：均值回归/情绪回摆（相对位置交易）。 2) range漂移：估值中枢上移/下移（常由D2、利率/流动性regime切换、长期 ROE 结构变化触发）。
-o 波动不是风险，搞不懂的波动才是风险。D3 的 driver 就是波动，如果波动小全靠 D1/D2。
-o D3 更像回撤管理与赔率调制器（buffer），而不是投资起点；它为 D1/D2 可能判断错误提供安全边际，但不能替代 D1 的质量或 D2 的实质变化。
-
-### 你的任务
-请熟读并理解以上的研究框架，结合框架与你能搜索到的所有有用信息（新闻、财报、业绩会、监管公告、行业数据等等）进行研究研究{STOCK_TICKER_PLACEHOLDER},并按照以下json格式输出打分：
-
-[{{
-"Date": "YYYY-MM-DD", 
-"M1T1": "0 - 10, M1在T1时间尺度上的得分，越高越说明这个公司所处行业或主题在上升周期或者强势期",
-"M1T1Rationale": "对M1T1打分做出一个简短的解释",
-"M1T2": "0 - 10, M1在T2时间尺度上的得分，越高越说明这个公司所处行业或主题在上升周期或者强势期",
-"M1T2Rationale": "对M1T2打分做出一个简短的解释",
-"M1T3": "0 - 10, M1在T3时间尺度上的得分，越高越说明这个公司所处行业或主题在上升周期或者强势期",
-"M1T3Rationale": "对M1T3打分做出一个简短的解释",
-"M2T1": "0 - 10, M2在T1时间尺度上的得分，越高越说明这个公司抢夺市场份额的能力在变强",
-"M2T1Rationale": "对M2T1打分做出一个简短的解释",
-"M2T2": "0 - 10, M2在T2时间尺度上的得分，越高越说明这个公司抢夺市场份额的能力在变强",
-"M2T2Rationale": "对M2T2打分做出一个简短的解释",
-"M2T3": "0 - 10, M2在T3时间尺度上的得分，越高越说明这个公司抢夺市场份额的能力在变强",
-"M2T3Rationale": "对M2T3打分做出一个简短的解释",
-"M3T1": "0 - 10, M3在T1时间尺度上的得分，越高越说明这个公司的margin在改善",
-"M3T1Rationale": "对M3T1打分做出一个简短的解释",
-"M3T2": "0 - 10, M3在T2时间尺度上的得分，越高越说明这个公司的margin在改善",
-"M3T2Rationale": "对M3T2打分做出一个简短的解释",
-"M3T3": "0 - 10, M3在T3时间尺度上的得分，越高越说明这个公司的margin在改善",
-"M3T3Rationale": "对M3T3打分做出一个简短的解释",
-"M4T1": "0 - 10, M4在T1时间尺度上的得分，越高越说明这个公司的商业模式好或者进步",
-"M4T1Rationale": "对M4T1打分做出一个简短的解释",
-"M4T2": "0 - 10, M4在T2时间尺度上的得分，越高越说明这个公司的商业模式好或者进步",
-"M4T2Rationale": "对M4T2打分做出一个简短的解释",
-"M4T3": "0 - 10, M4在T3时间尺度上的得分，越高越说明这个公司的商业模式好或者进步",
-"M4T3Rationale": "对M4T3打分做出一个简短的解释",
-"M5T1": "0 - 10, M5在T1时间尺度上的得分，越高说明管理层治理和资本运作越优秀",
-"M5T1Rationale": "对M5T1打分做出一个简短的解释",
-"M5T2": "0 - 10, M5在T2时间尺度上的得分，越高说明管理层治理和资本运作越优秀",
-"M5T2Rationale": "对M5T2打分做出一个简短的解释",
-"M5T3": "0 - 10, M5在T3时间尺度上的得分，越高说明管理层治理和资本运作越优秀",
-"M5T3Rationale": "对M5T3打分做出一个简短的解释",
-"D1": "0 - 10, D1的得分，越高越说明ROE/CAGR很好很稳定护城河很高",
-"D1Rationale": "对D1打分做出一个简短的解释",
-"D2": "0 - 10", D2的得分，越高越说明有向上的预期差，越低越说明有向下的预期差，请仔细考虑,
-"D2Rationale": "对D2打分做出一个简短的解释",
-"D3": "0 - 10, D3的得分，越高说明估值越便宜，反之越低说明估值越贵，但是要考虑是否因为一些原因rerating或derating了，贵和便宜是有可能justify的",
-"D3Rationale": "对D3打分做出一个简短的解释",
-"Source": "引用的URL"
-}}]
-
-"""
 
 # endregion
 
